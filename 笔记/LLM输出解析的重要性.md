@@ -89,7 +89,7 @@ action_match = re.search(r'Action:\s*(\w+)', output)
 ```python
 # OpenAI 的 Function Calling
 response = client.chat.completions.create(
-    model="gpt-3.5-turbo",
+    model="gpt-4.1",
     messages=messages,
     functions=[{
         "name": "calculate",

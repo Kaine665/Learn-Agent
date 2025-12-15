@@ -19,13 +19,13 @@ class FunctionCallingAgent:
     3. 更可靠、更现代的实现方式
     """
     
-    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo"):
+    def __init__(self, api_key: str, model: str = "gpt-4.1"):
         """
         初始化 Agent
         
         Args:
             api_key: OpenAI API Key
-            model: 使用的模型名称（Function Calling 需要 gpt-3.5-turbo 或更高版本）
+            model: 使用的模型名称（Function Calling 需要 gpt-4.1 或更高版本）
         """
         self.client = OpenAI(api_key=api_key)
         self.model = model
@@ -292,7 +292,15 @@ class FunctionCallingAgent:
             print(f"Thought: {thought}")
             print(f"Action: {action}")
             if action_input:
-                print(f"Action Input: {action_input}")
+                # 完整显示 Action Input，支持多行内容和字典
+                action_input_str = str(action_input)
+                if '\n' in action_input_str or len(action_input_str) > 100:
+                    print(f"Action Input:")
+                    print("-" * 50)
+                    print(action_input_str)
+                    print("-" * 50)
+                else:
+                    print(f"Action Input: {action_input_str}")
             print()
             
             # Action

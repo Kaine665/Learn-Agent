@@ -15,23 +15,25 @@ def main():
     # 创建 Agent
     agent = ToolIntegratedAgent(api_key=api_key)
     
-    # 示例1：使用计算器工具
+    # 示例1：简单计算
     print("\n" + "="*60)
-    print("示例1：使用计算器工具")
-    print("="*60)
-    agent.run("计算 123 * 456")
-    
-    # 示例2：使用搜索工具
+    print("示例1：数学计算")
+    print("="*60)    
+    agent.run("请一步一步计算函数 f(x) = x^3 * e^(2x) 的导数，并解释每一步用到的求导法则。")
+
+
+    # 示例2：知识问答
     print("\n" + "="*60)
-    print("示例2：使用搜索工具")
+    print("示例2：知识问答")
     print("="*60)
-    agent.run("搜索 Python 教程")
-    
-    # 示例3：复杂任务（需要多步）
+    agent.run("谁是世界上最美丽的女人")
+
+    # 示例3：软件制作
     print("\n" + "="*60)
-    print("示例3：复杂任务")
+    print("示例3：软件制作")
     print("="*60)
-    agent.run("先计算 100 * 2，然后搜索这个结果的相关信息")
+    agent.run("帮我写一个全栈安卓软件，用来记账并且AI洞察你的消费习惯")
+
 
 
 if __name__ == "__main__":

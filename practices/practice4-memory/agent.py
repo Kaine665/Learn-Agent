@@ -133,7 +133,7 @@ class AgentWithMemory:
     3. 自动更新记忆
     """
     
-    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo"):
+    def __init__(self, api_key: str, model: str = "gpt-4.1"):
         self.client = OpenAI(api_key=api_key)
         self.model = model
         self.stm = ShortTermMemory(max_turns=10)

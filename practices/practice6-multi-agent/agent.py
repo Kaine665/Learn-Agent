@@ -32,7 +32,7 @@ class BaseAgent(ABC):
     3. 支持消息接收和处理
     """
     
-    def __init__(self, name: str, role: str, expertise: str, api_key: str, model: str = "gpt-3.5-turbo"):
+    def __init__(self, name: str, role: str, expertise: str, api_key: str, model: str = "gpt-4.1"):
         self.name = name
         self.role = role
         self.expertise = expertise
@@ -81,7 +81,7 @@ class BaseAgent(ABC):
 class ResearchAgent(BaseAgent):
     """研究 Agent：负责搜索和收集信息"""
     
-    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo"):
+    def __init__(self, api_key: str, model: str = "gpt-4.1"):
         super().__init__(
             name="ResearchAgent",
             role="研究专家",
@@ -109,7 +109,7 @@ class ResearchAgent(BaseAgent):
 class AnalysisAgent(BaseAgent):
     """分析 Agent：负责分析和评估信息"""
     
-    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo"):
+    def __init__(self, api_key: str, model: str = "gpt-4.1"):
         super().__init__(
             name="AnalysisAgent",
             role="分析专家",
@@ -137,7 +137,7 @@ class AnalysisAgent(BaseAgent):
 class WriterAgent(BaseAgent):
     """写作 Agent：负责撰写内容"""
     
-    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo"):
+    def __init__(self, api_key: str, model: str = "gpt-4.1"):
         super().__init__(
             name="WriterAgent",
             role="写作专家",
@@ -165,7 +165,7 @@ class WriterAgent(BaseAgent):
 class ReviewerAgent(BaseAgent):
     """审查 Agent：负责审查和优化内容"""
     
-    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo"):
+    def __init__(self, api_key: str, model: str = "gpt-4.1"):
         super().__init__(
             name="ReviewerAgent",
             role="审查专家",
@@ -201,7 +201,7 @@ class CoordinatorAgent:
     4. 整合最终结果
     """
     
-    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo"):
+    def __init__(self, api_key: str, model: str = "gpt-4.1"):
         self.api_key = api_key
         self.model = model
         self.client = OpenAI(api_key=api_key)

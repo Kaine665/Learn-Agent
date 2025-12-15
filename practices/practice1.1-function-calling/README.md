@@ -38,7 +38,7 @@ functions = [{
 
 # 2. LLM 调用时返回结构化数据
 response = client.chat.completions.create(
-    model="gpt-3.5-turbo",
+    model="gpt-4.1",
     messages=messages,
     functions=functions  # ← 告诉 LLM 有哪些函数可用
 )
@@ -77,7 +77,7 @@ if response.choices[0].message.function_call:
 
 ```python
 response = client.chat.completions.create(
-    model="gpt-3.5-turbo",
+    model="gpt-4.1",
     messages=messages,
     functions=functions,           # 提供函数列表
     function_call="auto"           # 让 LLM 自动决定是否调用函数

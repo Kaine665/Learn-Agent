@@ -52,7 +52,7 @@ class ToolIntegratedAgent:
     3. 工具调用机制
     """
     
-    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo"):
+    def __init__(self, api_key: str, model: str = "gpt-4.1"):
         self.client = OpenAI(api_key=api_key)
         self.model = model
         self.max_iterations = 10
@@ -148,9 +148,11 @@ Action Input: 10 + 20
     
     def _parse_llm_output(self, output: str) -> Dict[str, Any]:
         """解析 LLM 输出"""
-        thought_match = re.search(r'Thought:\s*(.+?)(?=\n|$)', output, re.DOTALL)
+        # 改进：匹配多行内容，直到下一个 Thought/Action 或文件结尾
+        thought_match = re.search(r'Thought:\s*(.+?)(?=\nAction:|$)', output, re.DOTALL)
         action_match = re.search(r'Action:\s*(\w+)', output)
-        action_input_match = re.search(r'Action Input:\s*(.+?)(?=\n|$)', output, re.DOTALL)
+        # 改进：匹配多行 Action Input，直到下一个 Thought/Action 或文件结尾
+        action_input_match = re.search(r'Action Input:\s*(.+?)(?=\n(?:Thought|Action):|$)', output, re.DOTALL)
         
         thought = thought_match.group(1).strip() if thought_match else ""
         action = action_match.group(1).strip() if action_match else "finish"
@@ -258,7 +260,14 @@ Action Input: 10 + 20
             print(f"Thought: {thought}")
             print(f"Action: {action}")
             if action_input:
-                print(f"Action Input: {action_input}")
+                # 完整显示 Action Input，支持多行内容
+                if '\n' in action_input or len(action_input) > 100:
+                    print(f"Action Input:")
+                    print("-" * 50)
+                    print(action_input)
+                    print("-" * 50)
+                else:
+                    print(f"Action Input: {action_input}")
             print()
             
             # Action

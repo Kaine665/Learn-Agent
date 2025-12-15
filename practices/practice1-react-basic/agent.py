@@ -26,7 +26,7 @@ class SimpleReActAgent:
         
         Args:
             api_key: OpenAI API Key
-            model: 使用的模型名称
+            model: 使用的模型名称（默认：gpt-4.1）
         """
         self.client = OpenAI(api_key=api_key)
         self.model = model
@@ -67,9 +67,11 @@ Action Input: 10 + 20
         
         设计要点：使用正则表达式解析结构化输出
         """
-        thought_match = re.search(r'Thought:\s*(.+?)(?=\n|$)', output, re.DOTALL)
+        # 改进：匹配多行内容，直到下一个 Thought/Action 或文件结尾
+        thought_match = re.search(r'Thought:\s*(.+?)(?=\nAction:|$)', output, re.DOTALL)
         action_match = re.search(r'Action:\s*(\w+)', output)
-        action_input_match = re.search(r'Action Input:\s*(.+?)(?=\n|$)', output, re.DOTALL)
+        # 改进：匹配多行 Action Input，直到下一个 Thought/Action 或文件结尾
+        action_input_match = re.search(r'Action Input:\s*(.+?)(?=\n(?:Thought|Action):|$)', output, re.DOTALL)
         
         thought = thought_match.group(1).strip() if thought_match else ""
         action = action_match.group(1).strip() if action_match else "finish"
@@ -115,11 +117,21 @@ Action Input: 10 + 20
             })
         
         # 调用 LLM
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.7
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.7
+            )
+        except Exception as e:
+            error_msg = str(e)
+            if "401" in error_msg or "invalid_api_key" in error_msg.lower():
+                print(f"\n❌ API Key 认证失败！")
+                print(f"   请检查你的 OPENAI_API_KEY 环境变量是否正确设置")
+                print(f"   在 PowerShell 中设置: $env:OPENAI_API_KEY='your-api-key'")
+                raise
+            else:
+                raise
         
         output = response.choices[0].message.content
         parsed = self._parse_llm_output(output)
@@ -186,7 +198,14 @@ Action Input: 10 + 20
             print(f"Thought: {thought}")
             print(f"Action: {action}")
             if action_input:
-                print(f"Action Input: {action_input}")
+                # 完整显示 Action Input，支持多行内容
+                if '\n' in action_input or len(action_input) > 100:
+                    print(f"Action Input:")
+                    print("-" * 50)
+                    print(action_input)
+                    print("-" * 50)
+                else:
+                    print(f"Action Input: {action_input}")
             print()
             
             # 2. Action: 执行行动
