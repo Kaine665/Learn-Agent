@@ -22,7 +22,7 @@ class PlanAndExecuteAgent:
     def __init__(self, api_key: str, model: str = "gpt-4.1"):
         self.client = OpenAI(api_key=api_key)
         self.model = model
-        self.plan: List[str] = []
+        self.plan_steps: List[str] = []
         self.execution_results: Dict[int, str] = {}  # 步骤编号 -> 执行结果
     
     def _build_planning_prompt(self, goal: str) -> str:
@@ -114,10 +114,10 @@ class PlanAndExecuteAgent:
         print()
         
         # 解析计划
-        self.plan = self._parse_plan(plan_output)
+        self.plan_steps = self._parse_plan(plan_output)
         
-        print(f"✅ 计划生成完成，共 {len(self.plan)} 个步骤\n")
-        return self.plan
+        print(f"✅ 计划生成完成，共 {len(self.plan_steps)} 个步骤\n")
+        return self.plan_steps
     
     def _parse_plan(self, plan_text: str) -> List[str]:
         """
