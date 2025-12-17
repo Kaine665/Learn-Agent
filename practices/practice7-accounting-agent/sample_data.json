@@ -1,0 +1,33 @@
+[
+  {
+    "date": "2024-01-01",
+    "amount": 5000,
+    "category": "收入",
+    "description": "工资"
+  },
+  {
+    "date": "2024-01-05",
+    "amount": -50,
+    "category": "餐饮",
+    "description": "午餐"
+  },
+  {
+    "date": "2024-01-05",
+    "amount": -30,
+    "category": "交通",
+    "description": "地铁"
+  },
+  {
+    "date": "2024-01-08",
+    "amount": -120,
+    "category": "餐饮",
+    "description": "晚餐"
+  },
+  {
+    "date": "2024-01-10",
+    "amount": -200,
+    "category": "购物",
+    "description": "衣服"
+  }
+]
+

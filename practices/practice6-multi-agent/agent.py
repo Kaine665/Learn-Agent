@@ -301,12 +301,18 @@ class CoordinatorAgent:
             
             # 执行任务
             result = agent.process(subtask_desc, context)
-            results[agent_name] = result
             
-            # 更新上下文
+            # 检查结果是否为空
+            if result is None:
+                result = "⚠️ 警告：Agent 返回了空结果"
+                print(f"结果：{result}\n")
+            
+            # 保存结果和更新上下文（即使为空也要保存）
+            results[agent_name] = result
             context[agent_name] = result
             
-            print(f"结果：{result[:100]}...\n")
+            # 显示完整结果
+            print(f"结果：{result}\n")
             
             # 记录执行日志
             self.execution_log.append({
@@ -319,7 +325,11 @@ class CoordinatorAgent:
         # 3. 整合结果
         print("📝 整合结果：")
         final_result = self._integrate_results(task, results)
-        print(f"最终结果：{final_result[:200]}...\n")
+        
+        if final_result is None:
+            print("⚠️ 警告：最终结果为空\n")
+        else:
+            print(f"最终结果：\n{final_result}\n")
         
         return final_result
     

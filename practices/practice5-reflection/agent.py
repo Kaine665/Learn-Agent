@@ -100,11 +100,12 @@ class ReflectionAgent:
     
     def _build_improvement_prompt(self, goal: str, initial_result: str, critique: Dict[str, Any]) -> str:
         """
-        构建改进 Prompt
+        构建改进 Prompt（改进版：要求说明改动）
         
         设计要点：
         1. 提供初始结果和反思意见
         2. 要求生成改进后的结果
+        3. 要求详细说明改动位置和原因
         """
         return f"""你是一个优化专家。请根据反思意见改进结果。
 
@@ -115,49 +116,90 @@ class ReflectionAgent:
 问题：{critique['problems']}
 改进建议：{critique['improvements']}
 
-请生成改进后的结果。
+请生成改进后的结果，并详细说明你做了哪些改动以及为什么改动。
+
+请按照以下格式输出：
+
+改进后的结果：
+[改进后的完整结果]
+
+改动说明：
+1. [改动位置/内容]：原为"[原文片段]" → 改为"[新文片段]"，原因：[为什么改动]
+2. [改动位置/内容]：原为"[原文片段]" → 改为"[新文片段]"，原因：[为什么改动]
+...
 """
     
-    def refine(self, goal: str, initial_result: str, critique: Dict[str, Any]) -> str:
+    def refine(self, goal: str, initial_result: str, critique: Dict[str, Any]) -> Dict[str, Any]:
         """
-        结果优化：根据反思意见优化结果
+        结果优化：根据反思意见优化结果（改进版：返回改动说明）
         
         设计要点：
         1. 使用 LLM 根据反思意见优化
         2. 生成改进后的结果
+        3. 提取改动说明
+        
+        返回：
+        - optimized_result: 优化后的结果
+        - changes: 改动说明列表
         """
         prompt = self._build_improvement_prompt(goal, initial_result, critique)
         
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": "你是一个优化专家，能够根据反思意见改进结果。"},
+                {"role": "system", "content": "你是一个优化专家，能够根据反思意见改进结果，并详细说明改动原因。"},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7
         )
         
-        return response.choices[0].message.content
+        output = response.choices[0].message.content
+        
+        # 解析输出，提取改进后的结果和改动说明
+        return self._parse_refinement_output(output)
+    
+    def _parse_refinement_output(self, output: str) -> Dict[str, Any]:
+        """解析优化输出，提取结果和改动说明"""
+        # 提取改进后的结果
+        result_match = re.search(r'改进后的结果[：:]\s*(.+?)(?=\n改动说明|$)', output, re.DOTALL)
+        optimized_result = result_match.group(1).strip() if result_match else output
+        
+        # 提取改动说明
+        changes_match = re.search(r'改动说明[：:]\s*(.+?)$', output, re.DOTALL)
+        changes_text = changes_match.group(1).strip() if changes_match else ""
+        
+        # 解析改动列表（每行一个改动）
+        changes = []
+        if changes_text:
+            for line in changes_text.split('\n'):
+                line = line.strip()
+                # 匹配以数字开头或-开头的行
+                if line and (line[0].isdigit() or line.startswith('-')):
+                    # 移除序号和符号
+                    change_desc = re.sub(r'^\d+[\.、]\s*|- ', '', line)
+                    if change_desc:
+                        changes.append(change_desc)
+                # 如果没有找到格式化的改动说明，尝试提取所有包含"原为"或"改为"的行
+                elif line and ('原为' in line or '改为' in line or '原因' in line):
+                    changes.append(line)
+        
+        return {
+            "optimized_result": optimized_result,
+            "changes": changes,
+            "raw": output
+        }
     
     def handle_error(self, error: Exception, context: Dict[str, Any]) -> Dict[str, Any]:
         """
-        错误恢复：根据错误类型决定恢复策略
+        错误恢复：根据错误类型决定恢复策略（改进版：返回详细分析过程）
         
         设计要点：
         1. 分析错误类型
         2. 选择恢复策略
-        3. 返回恢复建议
+        3. 返回详细的分析过程
         """
         error_type = type(error).__name__
         error_msg = str(error)
-        
-        # 简单的错误分类和恢复策略
-        recovery_strategies = {
-            "网络错误": "重试操作",
-            "参数错误": "检查并调整参数",
-            "权限错误": "检查权限设置",
-            "超时错误": "增加超时时间或重试"
-        }
         
         # 使用 LLM 分析错误并给出恢复建议
         error_prompt = f"""执行过程中发生错误：
@@ -166,25 +208,59 @@ class ReflectionAgent:
 错误信息：{error_msg}
 上下文：{context}
 
-请分析错误原因，并给出恢复策略。
+请详细分析：
+1. 错误原因：为什么会发生这个错误？
+2. 错误影响：这个错误对任务有什么影响？
+3. 可能原因：可能的原因有哪些？
+4. 恢复策略：应该采取什么策略来恢复？
+5. 预防措施：如何避免再次发生？
+
+请按照以下格式输出：
+
+错误分析：
+原因：[详细分析错误原因]
+影响：[说明错误的影响]
+可能原因：[列出可能的原因]
+恢复策略：[具体的恢复策略]
+预防措施：[如何预防]
+
+是否应该重试：是/否
 """
         
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": "你是一个错误处理专家。"},
+                {"role": "system", "content": "你是一个错误处理专家，能够详细分析错误原因并提供恢复策略。"},
                 {"role": "user", "content": error_prompt}
             ],
             temperature=0.3
         )
         
-        recovery_advice = response.choices[0].message.content
+        analysis_output = response.choices[0].message.content
+        
+        # 解析分析结果
+        return self._parse_error_analysis(analysis_output, error_type, error_msg)
+    
+    def _parse_error_analysis(self, analysis_text: str, error_type: str, error_msg: str) -> Dict[str, Any]:
+        """解析错误分析结果"""
+        # 提取各个部分
+        reason_match = re.search(r'原因[：:]\s*(.+?)(?=\n影响|$)', analysis_text, re.DOTALL)
+        impact_match = re.search(r'影响[：:]\s*(.+?)(?=\n可能原因|$)', analysis_text, re.DOTALL)
+        possible_causes_match = re.search(r'可能原因[：:]\s*(.+?)(?=\n恢复策略|$)', analysis_text, re.DOTALL)
+        recovery_match = re.search(r'恢复策略[：:]\s*(.+?)(?=\n预防措施|$)', analysis_text, re.DOTALL)
+        prevention_match = re.search(r'预防措施[：:]\s*(.+?)(?=\n是否应该重试|$)', analysis_text, re.DOTALL)
+        retry_match = re.search(r'是否应该重试[：:]\s*(是|否)', analysis_text)
         
         return {
             "error_type": error_type,
             "error_msg": error_msg,
-            "recovery_advice": recovery_advice,
-            "should_retry": "重试" in recovery_advice or "retry" in recovery_advice.lower()
+            "reason": reason_match.group(1).strip() if reason_match else "",
+            "impact": impact_match.group(1).strip() if impact_match else "",
+            "possible_causes": possible_causes_match.group(1).strip() if possible_causes_match else "",
+            "recovery_strategy": recovery_match.group(1).strip() if recovery_match else "",
+            "prevention": prevention_match.group(1).strip() if prevention_match else "",
+            "should_retry": retry_match.group(1) == "是" if retry_match else False,
+            "raw": analysis_text
         }
     
     def execute_with_reflection(self, goal: str, action_func, *args, **kwargs) -> str:
@@ -203,17 +279,19 @@ class ReflectionAgent:
         
         best_result = None
         reflection_count = 0
+        current_result = None
         
         for iteration in range(self.max_reflections + 1):
             print(f"[执行 {iteration + 1}]")
             
             try:
-                # 1. 执行行动
+                # 1. 执行行动（只在第一次迭代时调用 action_func）
                 if iteration == 0:
                     result = action_func(*args, **kwargs)
+                    current_result = result
                 else:
-                    # 使用改进后的参数重试
-                    result = action_func(*args, **kwargs)
+                    # 后续迭代使用上一次优化后的结果
+                    result = current_result
                 
                 print(f"执行结果：{result}\n")
                 
@@ -243,19 +321,45 @@ class ReflectionAgent:
                 # 5. 如果不满意且还有机会，优化结果
                 if iteration < self.max_reflections:
                     print(f"[优化 {iteration + 1}]")
-                    result = self.refine(goal, result, reflection)
-                    print(f"优化后结果：{result}\n")
-                    best_result = result
+                    refinement = self.refine(goal, result, reflection)  # 现在返回字典
+                    optimized_result = refinement["optimized_result"]
+                    changes = refinement["changes"]
+                    
+                    print(f"优化后结果：{optimized_result}\n")
+                    
+                    # 显示改动说明
+                    if changes:
+                        print(f"📝 改动说明：")
+                        for i, change in enumerate(changes, 1):
+                            print(f"  {i}. {change}")
+                        print()
+                    else:
+                        print("📝 改动说明：无详细改动说明\n")
+                    
+                    current_result = optimized_result  # 更新当前结果，供下次迭代使用
+                    best_result = optimized_result
                     reflection_count += 1
                 else:
                     best_result = result
                     break
                     
             except Exception as e:
-                # 错误恢复
+                # 错误恢复（改进版：显示详细分析）
                 print(f"❌ 执行错误：{e}")
                 recovery = self.handle_error(e, {"goal": goal, "args": args, "kwargs": kwargs})
-                print(f"恢复建议：{recovery['recovery_advice']}\n")
+                
+                print(f"\n🔍 错误分析：")
+                if recovery.get("reason"):
+                    print(f"  原因：{recovery['reason']}")
+                if recovery.get("impact"):
+                    print(f"  影响：{recovery['impact']}")
+                if recovery.get("possible_causes"):
+                    print(f"  可能原因：{recovery['possible_causes']}")
+                if recovery.get("recovery_strategy"):
+                    print(f"  恢复策略：{recovery['recovery_strategy']}")
+                if recovery.get("prevention"):
+                    print(f"  预防措施：{recovery['prevention']}")
+                print(f"  是否重试：{'✅ 是' if recovery['should_retry'] else '❌ 否'}\n")
                 
                 if recovery['should_retry'] and iteration < self.max_reflections:
                     print("🔄 尝试恢复...")
