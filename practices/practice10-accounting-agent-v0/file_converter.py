@@ -66,6 +66,7 @@ class FormatDetector:
         Returns:
             FormatInfo: 格式信息
         """
+        # 检测文件扩展名
         file_ext = os.path.splitext(file_path)[1].lower()
         
         if file_ext == '.xlsx' or file_ext == '.xls':
@@ -599,197 +600,45 @@ class DataExtractor:
         )
 
 
-class InteractiveLearner:
-    """交互式学习器（使用ConverterLearningAgent）"""
-    
-    def __init__(self, api_key: str, model: str = "gpt-4.1"):
-        """
-        Args:
-            api_key: OpenAI API Key
-            model: 使用的模型
-        """
-        self.api_key = api_key
-        self.model = model
-        # 延迟导入，避免循环依赖
-        self._agent = None
-    
-    @property
-    def agent(self):
-        """延迟加载Agent"""
-        if self._agent is None:
-            from converter_agent import ConverterLearningAgent
-            self._agent = ConverterLearningAgent(self.api_key, self.model)
-        return self._agent
-    
-    def identify_issues(self, extraction_result: ExtractionResult, format_info: FormatInfo) -> List[str]:
-        """识别问题"""
-        issues = []
-        
-        if not extraction_result.success:
-            issues.extend(extraction_result.issues)
-        
-        if extraction_result.confidence < 1.0:
-            issues.append(f"提取自信度较低：{extraction_result.confidence}")
-        
-        if extraction_result.validation_errors:
-            issues.append(f"发现{len(extraction_result.validation_errors)}个验证错误")
-        
-        return issues
-    
-    def discuss_with_user(self, file_path: str, format_info: FormatInfo, issues: List[str]) -> Dict[str, Any]:
-        """
-        与用户讨论，获取指导
-        
-        Returns:
-            用户指导信息
-        """
-        # 使用ConverterLearningAgent来分析文件
-        result = self.agent.learn_from_file(file_path)
-        
-        if result["status"] == "need_interaction":
-            # 需要交互，展示结构信息
-            structure_info = result.get("structure_info", {})
-            formatted_info = self.agent.format_structure_info(structure_info)
-            
-            print("\n" + "="*60)
-            print("📋 文件格式识别结果")
-            print("="*60)
-            print(f"文件类型：{format_info.file_type}")
-            print(f"数据源类型：{format_info.source_type}")
-            print(f"格式特征：{', '.join(format_info.signatures)}")
-            print(f"\n{formatted_info}")
-            
-            if result["issues"]:
-                print(f"\n⚠️ 发现以下问题：")
-                for issue in result["issues"]:
-                    print(f"  - {issue}")
-            
-            print("\n💡 需要您的帮助来建立转换规则")
-            print("="*60)
-        
-        return {
-            "status": result["status"],
-            "issues": result["issues"],
-            "structure_info": result.get("structure_info", {}),
-            "format_info": format_info
-        }
-    
-    def generate_rule(self, format_info: FormatInfo, user_guidance: Dict[str, Any]) -> ConversionRule:
-        """
-        根据用户指导生成规则
-        
-        Args:
-            format_info: 格式信息
-            user_guidance: 用户指导（包含user_input等）
-        """
-        file_path = user_guidance.get("file_path")
-        user_input = user_guidance.get("user_input", "")
-        structure_info = user_guidance.get("structure_info", {})
-        issues = user_guidance.get("issues", [])
-        
-        if file_path:
-            # 使用Agent的交互方法
-            result = self.agent.interact_with_user(
-                file_path=file_path,
-                issues=issues,
-                structure_info=structure_info,
-                format_info=format_info,
-                user_input=user_input
-            )
-            
-            if result["status"] == "success":
-                return result["rule"]
-            elif result["status"] == "continue":
-                # 需要更多信息，返回问题
-                return None
-        
-        # 如果无法生成，返回None
-        return None
-
-
 class FileConverter:
     """文件转换器（主入口）"""
     
-    def __init__(self, api_key: Optional[str] = None, rules_dir: str = "data/rules"):
+    def __init__(self, rules_dir: str = "data/rules"):
         """
         Args:
-            api_key: OpenAI API Key（用于交互式学习）
             rules_dir: 规则存储目录
         """
         self.format_detector = FormatDetector()
         self.rule_manager = RuleManager(rules_dir)
         self.data_extractor = DataExtractor(self.rule_manager)
-        self.interactive_learner = InteractiveLearner(api_key) if api_key else None
+        # 使用 ConverterAgent 来查找规则（支持快速通道和规则库）
+        from converter_agent import ConverterAgent
+        self.converter_agent = ConverterAgent(rules_dir)
     
-    def convert(self, file_path: str, interactive: bool = True) -> Tuple[bool, List[Transaction], Optional[str]]:
+    def convert(self, file_path: str) -> Tuple[bool, List[Transaction], Optional[str]]:
         """
-        转换文件
+        转换文件（只支持硬编码和规则库匹配）
         
         Args:
             file_path: 文件路径
-            interactive: 是否启用交互式学习
         
         Returns:
             (success, transactions, message)
         """
-        # 1. 检测格式
-        format_info = self.format_detector.detect(file_path)
-        
-        # 2. 查找规则
-        rule = self.rule_manager.find_rule(format_info)
+        # 1. 使用 ConverterAgent 查找规则（支持快速通道和规则库）
+        rule = self.converter_agent.find_rule(file_path)
         
         if rule:
-            # 3. 应用规则提取
+            # 2. 应用规则提取
             print(f"✅ 找到匹配规则：{rule.rule_id}")
             result = self.data_extractor.extract(file_path, rule)
             
             if result.success:
                 return True, result.data, f"成功提取 {len(result.data)} 条记录"
             else:
+                print(f"❌ 提取失败：{', '.join(result.issues)}")
                 return False, [], f"提取失败：{', '.join(result.issues)}"
         else:
-            # 4. 尝试自动提取
-            print("⚠️ 未找到匹配规则，尝试自动提取...")
-            result = self.data_extractor.auto_extract(file_path, format_info)
-            
-            if result.success and result.confidence >= 1.0:
-                # 自动提取成功，生成规则
-                rule = self.interactive_learner.generate_rule(format_info, {}) if self.interactive_learner else None
-                if rule:
-                    self.rule_manager.save_rule(rule)
-                return True, result.data, f"自动提取成功，提取了 {len(result.data)} 条记录"
-            else:
-                # 需要用户交互
-                if interactive and self.interactive_learner:
-                    # 使用ConverterLearningAgent学习
-                    learn_result = self.interactive_learner.agent.learn_from_file(file_path)
-                    
-                    if learn_result["status"] == "success":
-                        # 找到了规则或自动生成了规则
-                        if learn_result.get("rule"):
-                            # 尝试提取数据
-                            extract_result = self.data_extractor.extract(file_path, learn_result["rule"])
-                            if extract_result.success:
-                                return True, extract_result.data, f"成功：{learn_result['message']}"
-                        return True, [], f"成功：{learn_result['message']}"
-                    elif learn_result["status"] == "need_interaction":
-                        # 需要用户交互
-                        issues = learn_result["issues"]
-                        structure_info = learn_result.get("structure_info", {})
-                        formatted_info = self.interactive_learner.agent.format_structure_info(structure_info)
-                        
-                        message = f"""需要用户交互来建立转换规则
-
-{formatted_info}
-
-问题：
-{chr(10).join(f'- {issue}' for issue in issues)}
-
-请在交互模式中回答这些问题，系统将自动生成转换规则。
-"""
-                        return False, [], message
-                    else:
-                        return False, [], f"学习失败：{learn_result.get('message', '未知错误')}"
-                else:
-                    return False, [], f"无法自动提取，需要转换规则。格式特征：{', '.join(format_info.signatures)}"
+            # 3. 找不到规则，已经打印失败信息
+            return False, [], "未找到匹配的转换规则"
 

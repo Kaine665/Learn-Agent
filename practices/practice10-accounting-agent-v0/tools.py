@@ -124,8 +124,8 @@ class FileParserTool:
         # 🔥 优先使用新的文件转换框架
         if CONVERTER_AVAILABLE:
             try:
-                converter = FileConverter(api_key=api_key)
-                success, transactions, message = converter.convert(file_path, interactive=False)
+                converter = FileConverter()
+                success, transactions, message = converter.convert(file_path)
                 
                 if success:
                     print(f"✅ {message}")
