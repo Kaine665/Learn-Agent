@@ -1,0 +1,18 @@
+﻿{
+    "stage":  "learning",
+    "created_at":  "2026-01-18",
+    "id":  "Learn-Agent",
+    "tags":  [
+
+             ],
+    "category":  "",
+    "name":  "Learn-Agent",
+    "summary":  "",
+    "history":  [
+                    {
+                        "date":  "2026-01-18",
+                        "note":  "Initialized",
+                        "stage":  "learning"
+                    }
+                ]
+}
